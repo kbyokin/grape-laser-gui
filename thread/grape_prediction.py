@@ -102,7 +102,7 @@ class GrapeDetection(Thread):
                 self.predictions.clear()
                 self.predictions.update(format_result)
         
-            time.sleep(5)
+            # time.sleep(1)
             
             
     def get_latest_prediction(self):
