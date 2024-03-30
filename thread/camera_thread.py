@@ -13,22 +13,22 @@ class CameraThread(Thread):
         self.latest_depth_frame = None
         self.running = True
         
-        # try:
-        #     # Initiate Realsense settings
-        #     self.pipeline = rs.pipeline()
-        #     self.config = rs.config()
+        try:
+            # Initiate Realsense settings
+            self.pipeline = rs.pipeline()
+            self.config = rs.config()
             
-        #     self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-        #     self.config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, 30)
-        #     self.pipeline.start(self.config)
+            self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+            self.config.enable_stream(rs.stream.color, 640, 480, rs.format.rgb8, 30)
+            self.pipeline.start(self.config)
             
-        #     align_to = rs.stream.color
-        #     self.align = rs.align(align_to)
+            align_to = rs.stream.color
+            self.align = rs.align(align_to)
             
-        #     self.use_realsense = True
-        # except Exception as e:
-        #     print(f"Failed to start RealSense pipeline: {e}")
-        #     self.use_realsense = False
+            self.use_realsense = True
+        except Exception as e:
+            print(f"Failed to start RealSense pipeline: {e}")
+            self.use_realsense = False
         
         self.use_realsense = False
         

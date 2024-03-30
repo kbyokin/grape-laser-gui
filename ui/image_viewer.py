@@ -1,3 +1,4 @@
+from os import remove
 from PySide6.QtWidgets import QMainWindow, QLabel, QWidget, QApplication, QHBoxLayout, QVBoxLayout
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtCore import Qt, QTimer, QDateTime, QSize, Slot
@@ -5,10 +6,11 @@ from PySide6.QtCore import Qt, QTimer, QDateTime, QSize, Slot
 import cv2
 
 class ImageViewer(QWidget):
-    def __init__(self, camera_thread):
+    def __init__(self, camera_thread, predictions, prediction_lock):
         super().__init__()
         self.camera_thread = camera_thread
-        
+        self.predictions = predictions
+        self.prediction_lock = prediction_lock
         layout = QVBoxLayout(self)
         # self.setLayout(layout)
         
@@ -25,9 +27,20 @@ class ImageViewer(QWidget):
         
     def update_image(self):
         frame = self.camera_thread.get_latest_frame()
-        draw_image = frame.copy()
-        print(frame.shape)
         if frame is not None:
+            draw_image = frame.copy()
+            w, h, ch = draw_image.shape
+            cv2.circle(draw_image, (int(h // 2), int(w // 2)), 10, (0, 0, 255), 2)
+            
+            
+            with self.prediction_lock:
+                if self.predictions:
+                    print(self.predictions)
+                    remove_xyxy = self.predictions['remove']
+                    if len(self.predictions['bunch']) > 0:
+                        x1, y1, x2, y2 = map(int, remove_xyxy)
+                        cv2.rectangle(draw_image, (x1, y1), (x2, y2), (0, 255, 255), 2)
+                    
             rgb_image = cv2.cvtColor(draw_image, cv2.COLOR_BGR2RGB)
             w, h, ch = rgb_image.shape
             bytes_per_line = ch * h
@@ -35,3 +48,6 @@ class ImageViewer(QWidget):
             pixmap = QPixmap.fromImage(qt_image)
             self.image_label.setPixmap(pixmap)
             self.image_label.setScaledContents(True)        # Scale the pixmap to fit the QLabel size
+                    
+        else:
+            print('counld not retreive frame')
