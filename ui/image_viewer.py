@@ -1,10 +1,13 @@
+import os
 import time
 from PySide6.QtWidgets import QMainWindow, QLabel, QWidget, QApplication, QHBoxLayout, QVBoxLayout
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtCore import Qt, QTimer, QDateTime, QSize, Slot
 
 import cv2
+from pathlib import Path
 from matplotlib.mlab import angle_spectrum
+from networkx import draw
 
 class ImageViewer(QWidget):
     def __init__(self, camera_thread, predictions, prediction_lock, angles, angle_lock, control_motor):
@@ -31,6 +34,21 @@ class ImageViewer(QWidget):
         
         self.current = time.time()
         
+        self.current_frame = 0
+        
+        self.save_video()
+        
+    def save_video(self):
+        self.save_path = f"./experiments/{self.get_datetime()}"
+        os.mkdir(self.save_path)
+        # save_at = Path(self.save_path)
+        # save_at.mkdir(parents=True, exist_ok=True)
+        
+    def get_datetime(self):
+        current_datetime = QDateTime.currentDateTime()                
+        date_formatted =current_datetime.toString("yyyy-MM-dd HH:mm:ss")
+        return date_formatted
+        
     def update_image(self):
         frame = self.camera_thread.get_latest_frame()
         if frame is not None:
@@ -38,35 +56,42 @@ class ImageViewer(QWidget):
             w, h, ch = draw_image.shape
             image_center = [(h // 2), (w // 2)]
             cv2.circle(draw_image, (int(h // 2), int(w // 2)), 10, (0, 0, 255), 2)
-            
+            cv2.putText(draw_image, self.get_datetime(), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
             
             with self.prediction_lock:
                 if self.predictions:
-                    # print(self.predictions)
+                    print(self.predictions)
                     if len(self.predictions['bunch']) > 0:
-                        remove_xyxy = self.predictions["bunch"][0]
-                        # remove_xyxy = self.predictions["remove"]
+                        # remove_xyxy = self.predictions["bunch"][0]
+                        remove_xyxy = self.predictions["remove"]
                         x1, y1, x2, y2 = map(int, remove_xyxy)
                         removing_center = (int(x1+x2) // 2, int(y1+y2) // 2)
                         cv2.circle(draw_image, removing_center, 2, (0, 0, 255), -1)
+                        # cv2.line(draw_image, removing_center, (int(x1 * .3), int(y1 * .3)), (0, 0, 255), 5) # type: ignore
+                        # cv2.line(draw_image, (int(x1 + int(x1 * .3)), int(y1 + int(y1 * .6))), (int(x2 - int(x2 * .3)), int(y2 - int(y2 * .6))), (0, 0, 255), 5) # type: ignore
                         cv2.rectangle(draw_image, (x1, y1), (x2, y2), (0, 255, 255), 2)
                         
-                        self.prev = time.time()
-                        if self.current - self.prev <= -1:
-                            dis_x, dis_y = image_center[0] - removing_center[0], image_center[1] -  removing_center[1]
+                        # cv2.imwrite(f'{self.save_path}/draw_{self.current_frame}.jpg', draw_image)
+                        # cv2.imwrite(f'{self.save_path}/frame_{self.current_frame}.jpg', frame)
+                        self.current_frame += 1
+                        print(self.current_frame)
+                        # self.prev = time.time()
+                        # if self.current - self.prev <= 0:
+                        #     dis_x, dis_y = image_center[0] - removing_center[0], image_center[1] -  removing_center[1]
                         
-                            with self.angle_lock:
-                                if len(self.angles) > 0:
-                                    print(f'self angles: {self.angles}')
-                                    # calculate angle
-                                    angles = self.control_motors.angles_cal(self.angles[0], self.angles[1], (dis_x, dis_y))
-                                    self.angles = [angles[0], angles[1]]
-                                    self.control_motors.send_angles_api(self.angles)
-                                else:
-                                    print(self.angles)
-                                    self.angles = ['50', '80']
-                                    self.control_motors.send_angles_api(self.angles)
-                    
+                        #     with self.angle_lock:
+                        #         if len(self.angles) > 0:
+                        #             print(f'self angles: {self.angles}')
+                        #             # calculate angle
+                        #             angles = self.control_motors.angles_cal(self.angles[0], self.angles[1], (dis_x, dis_y))
+                        #             self.angles = [angles[0], angles[1]]
+                        #             self.control_motors.send_angles_api(self.angles)
+                        #         else:
+                        #             print(self.angles)
+                        #             self.angles = ['50', '80']
+                        #             self.control_motors.send_angles_api(self.angles)
+
+                        
             rgb_image = cv2.cvtColor(draw_image, cv2.COLOR_BGR2RGB)
             w, h, ch = rgb_image.shape
             bytes_per_line = ch * h

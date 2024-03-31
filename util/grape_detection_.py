@@ -26,7 +26,7 @@ class PadToSquare:
         return F.pad(img, padding, self.fill, self.padding_mode) # type: ignore
 
 class GrapeDetection():
-    def __init__(self, grape_detection_path, removal_path):
+    def __init__(self, grape_detection_path="/Users/kb/Developer/berry_thinning/models/detection/yolov5s_2cls15_best.pt", removal_path="/Users/kb/Developer/berry_thinning/models/removal/resnet18_bbox_aug_True_ratio1-8_bs-8_lr-0.001_epoch-3000 (1).pth"):
         super().__init__()
         self.grape_detection_path = grape_detection_path
         self.removal_path = removal_path
