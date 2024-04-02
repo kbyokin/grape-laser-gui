@@ -1,13 +1,11 @@
 import os
+from pathlib import Path
 import time
-from PySide6.QtWidgets import QMainWindow, QLabel, QWidget, QApplication, QHBoxLayout, QVBoxLayout
+from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtCore import Qt, QTimer, QDateTime, QSize, Slot
+from PySide6.QtCore import QTimer, QDateTime
 
 import cv2
-from pathlib import Path
-from matplotlib.mlab import angle_spectrum
-from networkx import draw
 
 class ImageViewer(QWidget):
     def __init__(self, camera_thread, predictions, prediction_lock, angles, angle_lock, control_motor):
@@ -32,17 +30,28 @@ class ImageViewer(QWidget):
         timer.timeout.connect(self.update_image)
         timer.start(30)     # update image every 30ms
         
+        self.remove_timer = QTimer(self)
+        self.remove_timer.timeout.connect(self.update_remove_xyxy)
+        self.remove_timer.start(20000)
+        
         self.current = time.time()
         
-        self.current_frame = 0
+        self.current_frame = 100
+        
+        self.remove_xyxy_ = None
+        self.x_prime = 0
+        self.y_prime = 0
+        
+        self.removing_history = []
         
         self.save_video()
         
     def save_video(self):
         self.save_path = f"./experiments/{self.get_datetime()}"
         os.mkdir(self.save_path)
-        # save_at = Path(self.save_path)
-        # save_at.mkdir(parents=True, exist_ok=True)
+        save_at = Path(self.save_path)
+        save_at.mkdir(parents=True, exist_ok=True)
+        print(f"save at: {self.save_path}")
         
     def get_datetime(self):
         current_datetime = QDateTime.currentDateTime()                
@@ -57,42 +66,71 @@ class ImageViewer(QWidget):
             image_center = [(h // 2), (w // 2)]
             cv2.circle(draw_image, (int(h // 2), int(w // 2)), 10, (0, 0, 255), 2)
             cv2.putText(draw_image, self.get_datetime(), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1, cv2.LINE_AA)
-            
+                        
             with self.prediction_lock:
                 if self.predictions:
-                    print(self.predictions)
+                    # print(self.predictions)
                     if len(self.predictions['bunch']) > 0:
-                        # remove_xyxy = self.predictions["bunch"][0]
-                        remove_xyxy = self.predictions["remove"]
-                        x1, y1, x2, y2 = map(int, remove_xyxy)
-                        removing_center = (int(x1+x2) // 2, int(y1+y2) // 2)
-                        cv2.circle(draw_image, removing_center, 2, (0, 0, 255), -1)
-                        # cv2.line(draw_image, removing_center, (int(x1 * .3), int(y1 * .3)), (0, 0, 255), 5) # type: ignore
-                        # cv2.line(draw_image, (int(x1 + int(x1 * .3)), int(y1 + int(y1 * .6))), (int(x2 - int(x2 * .3)), int(y2 - int(y2 * .6))), (0, 0, 255), 5) # type: ignore
-                        cv2.rectangle(draw_image, (x1, y1), (x2, y2), (0, 255, 255), 2)
+                        """
+                        Draw rectangle on Grape bunch
+                        """
+                        bunch_xyxy = self.predictions["bunch"][0]
+                        bunch_x1, bunch_y1, bunch_x2, bunch_y2 = map(int, bunch_xyxy)
+                        cv2.rectangle(draw_image, (bunch_x1, bunch_y1), (bunch_x2, bunch_y2), (0, 255, 255), 2)
                         
-                        # cv2.imwrite(f'{self.save_path}/draw_{self.current_frame}.jpg', draw_image)
-                        # cv2.imwrite(f'{self.save_path}/frame_{self.current_frame}.jpg', frame)
-                        self.current_frame += 1
-                        print(self.current_frame)
-                        # self.prev = time.time()
-                        # if self.current - self.prev <= 0:
-                        #     dis_x, dis_y = image_center[0] - removing_center[0], image_center[1] -  removing_center[1]
+                        # initial point
+                        if self.remove_xyxy_ is None:
+                            if len(self.predictions['remove']) > 0:
+                                print('initiate points')
+                                self.remove_xyxy_ = self.predictions["remove"]      # for breaking the loop
+                                remove_xyxy = self.predictions["remove"]
+                                removing_x1, removing_y1, removing_x2, removing_y2 = map(int, remove_xyxy)
+                                removing_center = (int(removing_x1+removing_x2) // 2, int(removing_y1+removing_y2) // 2)
+                                
+                                # x_coor, y_coor = removing_center[0], removing_center[1]
+                                self.x_prime = (removing_center[0] - bunch_x1) / (bunch_x2 - bunch_x1)
+                                self.y_prime = (removing_center[1] - bunch_y1) / (bunch_y2 - bunch_y1)
+                                x_coor = int(((bunch_x2 - bunch_x1) * self.x_prime) + bunch_x1)
+                                y_coor = int(((bunch_y2 - bunch_y1) * self.y_prime) + bunch_y1)
+                                
+                                self.removing_history.append([x_coor, y_coor])
+                                
+                                print(f'initiate: {bunch_xyxy, remove_xyxy}')
+                                
+                                cv2.rectangle(draw_image, (remove_xyxy[0], remove_xyxy[1]), (remove_xyxy[2], remove_xyxy[3]), (0, 255, 255), 2)
+                                                                
+                        # draw removing berry with normalize points
+                        if self.remove_xyxy_ is not None:
+                            remove_xyxy = self.predictions["remove"]
+                            removing_x1, removing_y1, removing_x2, removing_y2 = map(int, remove_xyxy)
+                            removing_center = (int(removing_x1+removing_x2) // 2, int(removing_y1+removing_y2) // 2)
+                            
+                            # x_coor, y_coor = removing_center[0], removing_center[1]
+                            
+                            x_coor = int(((bunch_x2 - bunch_x1) * self.x_prime) + bunch_x1)
+                            y_coor = int(((bunch_y2 - bunch_y1) * self.y_prime) + bunch_y1)
+                            
+                            self.removing_history.append([x_coor, y_coor])
+                            # print(f"xyxy_: {self.remove_xyxy_}")
+                            # print(f'bunch xyxy: {bunch_xyxy}')
+                            # print(f"x y coor: {x_coor, y_coor}")
+                            
+                            cv2.rectangle(draw_image, (removing_x1, removing_y1), (removing_x2, removing_y2), (0, 255, 255), 2)
+                            
+                        cv2.circle(draw_image, (x_coor, y_coor), 2, (0, 0, 255), -1)
                         
-                        #     with self.angle_lock:
-                        #         if len(self.angles) > 0:
-                        #             print(f'self angles: {self.angles}')
-                        #             # calculate angle
-                        #             angles = self.control_motors.angles_cal(self.angles[0], self.angles[1], (dis_x, dis_y))
-                        #             self.angles = [angles[0], angles[1]]
-                        #             self.control_motors.send_angles_api(self.angles)
-                        #         else:
-                        #             print(self.angles)
-                        #             self.angles = ['50', '80']
-                        #             self.control_motors.send_angles_api(self.angles)
-
+                        if len(self.removing_history) > 2:
+                            for indx in range(len(self.removing_history)):
+                                if indx + 1 < len(self.removing_history):
+                                    cv2.line(draw_image, (self.removing_history[indx][0], self.removing_history[indx][1]), (self.removing_history[indx + 1][0], self.removing_history[indx + 1][1]), (255, 0, 0))
+                                    
+                                    
+                        
+                        
                         
             rgb_image = cv2.cvtColor(draw_image, cv2.COLOR_BGR2RGB)
+            cv2.imwrite(f'{self.save_path}/{self.current_frame}.jpg', rgb_image[:, :, ::-1])
+            self.current_frame += 1
             w, h, ch = rgb_image.shape
             bytes_per_line = ch * h
             qt_image = QImage(rgb_image.data, h, w, bytes_per_line, QImage.Format_RGB888)
@@ -102,3 +140,27 @@ class ImageViewer(QWidget):
                     
         else:
             print('counld not retreive frame')
+    
+    def normalize_bunch(self, bunch_xyxy, remove_xyxy, remove_center):
+        min_x, min_y, max_x, max_y = map(int, bunch_xyxy)
+        
+        x_prime = (remove_center[0] - min_x) / (max_x - min_x)
+        y_prime = (remove_center[1] - min_y) / (max_y - min_y)
+        
+        x_coor = int(((max_x - min_x) * x_prime) + min_x)
+        y_coor = int(((max_y - min_y) * y_prime) + min_y)
+        
+        return x_coor, y_coor
+            
+    def update_remove_xyxy(self):
+        if self.predictions["remove"] is not None:
+            print('update remove xyxy')
+            bunch_x1, bunch_y1, bunch_x2, bunch_y2 = map(int, self.predictions['bunch'][0])
+            remove_xyxy = self.predictions["remove"]
+            removing_x1, removing_y1, removing_x2, removing_y2 = map(int, remove_xyxy)
+            removing_center = (int(removing_x1+removing_x2) // 2, int(removing_y1+removing_y2) // 2)
+            self.x_prime = (removing_center[0] - bunch_x1) / (bunch_x2 - bunch_x1)
+            self.y_prime = (removing_center[1] - bunch_y1) / (bunch_y2 - bunch_y1)
+            
+            
+            self.remove_xyxy_ = self.predictions["remove"]

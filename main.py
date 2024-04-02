@@ -26,8 +26,9 @@ def main():
     grape_detection = GrapeDetection(camera_thread, predictions, prediction_lock, grape_model_path, removal_model_path)
     grape_detection.start()
     
-    control_motor = ControlMotor(camera_thread, predictions, prediction_lock)
-    control_motor.start()
+    # control_motor = ControlMotor(camera_thread, predictions, prediction_lock)
+    # control_motor.start()
+    control_motor = []
     
     """
     GUI
@@ -48,8 +49,8 @@ def main():
     camera_thread.join()
     grape_detection.stop()
     grape_detection.join()
-    control_motor.stop()
-    control_motor.join()
+    # control_motor.stop()
+    # control_motor.join()
     sys.exit(ret)
     
 if __name__ == "__main__":

@@ -56,14 +56,14 @@ class ControlMotor(Thread):
         AZ, ALT = int(self.AZ), int(self.ALT)
         min_angle, max_angle = 0, 120
         
-        if dis_x > 10:
+        if dis_x > 5:
             if dis_x < 50:
                 AZ = max(min(AZ + 1, max_angle), min_angle)
             # elif dis_x < 50:
             #     AZ = max(min(AZ - 1, max_angle), min_angle)
             else:
                 AZ = max(min(AZ + 5, max_angle), min_angle)
-        elif dis_x < -10:
+        elif dis_x < -5:
             if dis_x > -50:
                 AZ = max(min(AZ - 1, max_angle), min_angle)
             else:
@@ -72,12 +72,12 @@ class ControlMotor(Thread):
             # print('should not update AZ')
             pass
                 
-        if dis_y > 10:
+        if dis_y > 5:
             if dis_y < 50:
                 ALT = max(min(ALT - 1, max_angle), min_angle)
             else:
                 ALT = max(min(ALT - 5, max_angle), min_angle)
-        elif dis_y < -10:
+        elif dis_y < -5:
             if dis_y > -50:
                 ALT = max(min(ALT + 1, max_angle), min_angle)
             else:
