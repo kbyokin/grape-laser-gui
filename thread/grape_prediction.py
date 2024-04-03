@@ -1,8 +1,10 @@
+import json
 import time
 import datetime
 from threading import Thread
 import cv2
 
+import requests
 import torch
 from torchvision import transforms
 
@@ -40,6 +42,10 @@ class GrapeDetection(Thread):
         self.predictions = predictions
         self.running = True
         
+        self.api_url = "http://172.23.161.109:8300/detect_grape_bunch"
+        
+        self.local_prediction = False
+        
         self.berry_removing_transforms = transforms.Compose([
             PadToSquare(fill=(0, 0, 0)),  # Black padding
             transforms.Resize([224, 224]),
@@ -64,45 +70,48 @@ class GrapeDetection(Thread):
     def run(self):
         while self.running:
             frame = self.camera_thread.get_latest_frame()
-            pred = self.grape_detection_model(frame)
-            pred = pred.xyxy[0].cpu().numpy()
-            classes = pred[:, 5]
-            bunch_indices = classes == 0
-            berry_indices = classes == 1
-            
-            bunch_boxes = pred[bunch_indices][:, :4]
-            berry_boxes = pred[berry_indices][:, :4]
-            
-            # Preprocess removing inputs
-            if len(bunch_boxes) > 0:
-                selected_bunch_bbox = bunch_boxes[0]
+            if self.local_prediction:
+                pred = self.grape_detection_model(frame)
+                pred = pred.xyxy[0].cpu().numpy()
+                classes = pred[:, 5]
+                bunch_indices = classes == 0
+                berry_indices = classes == 1
                 
-                cutting_pred_images = [self.create_cutting_input(berry_box, selected_bunch_bbox, frame.copy(), idx) for idx, berry_box in enumerate(berry_boxes)]
-                batch_cutting_pred_image = torch.stack(cutting_pred_images)
-                with torch.no_grad():
-                    output_removing_berries = self.removal_path_model(batch_cutting_pred_image)
+                bunch_boxes = pred[bunch_indices][:, :4]
+                berry_boxes = pred[berry_indices][:, :4]
+                
+                # Preprocess removing inputs
+                if len(bunch_boxes) > 0:
+                    selected_bunch_bbox = bunch_boxes[0]
+                    
+                    cutting_pred_images = [self.create_cutting_input(berry_box, selected_bunch_bbox, frame.copy(), idx) for idx, berry_box in enumerate(berry_boxes)]
+                    batch_cutting_pred_image = torch.stack(cutting_pred_images)
+                    with torch.no_grad():
+                        output_removing_berries = self.removal_path_model(batch_cutting_pred_image)
+                
+                    format_result = {
+                        'bunch': bunch_boxes.tolist()[0],
+                        'berry': berry_boxes.tolist(),
+                        'remove': berry_boxes[self.get_max_remove_index(output_removing_berries)]
+                    }
+                else:
+                    format_result = {
+                        'bunch': [],
+                        'berry': [],
+                        'remove': []
+                    }
+                
+                
+                # print(f"bunch: {len(pred[bunch_indices].tolist())}")
+                # print(f"berry: {len(pred[berry_indices].tolist())}")
+                
+                with self.prediction_lock:
+                    self.predictions.clear()
+                    self.predictions.update(format_result)
             
-                format_result = {
-                    'bunch': bunch_boxes.tolist(),
-                    'berry': berry_boxes.tolist(),
-                    'remove': berry_boxes[self.get_max_remove_index(output_removing_berries)]
-                }
+                # time.sleep(5)
             else:
-                format_result = {
-                    'bunch': [],
-                    'berry': [],
-                    'remove': []
-                }
-            
-            
-            # print(f"bunch: {len(pred[bunch_indices].tolist())}")
-            # print(f"berry: {len(pred[berry_indices].tolist())}")
-            
-            with self.prediction_lock:
-                self.predictions.clear()
-                self.predictions.update(format_result)
-        
-            # time.sleep(5)
+                self.detect_via_api(self.api_url, frame)
             
             
     def get_latest_prediction(self):
@@ -110,3 +119,27 @@ class GrapeDetection(Thread):
         
     def stop(self):
         self.running = False
+        
+    def detect_via_api(self, api_url, image) -> dict[str, str]:
+        try:
+            _, image_bytes = cv2.imencode(".jpg", image)
+            # PILLOW
+            # image_bytes = BytesIO()
+            # image.save(image_bytes, format="JPEG")
+            
+            files = {'image': ('image.jpg', image_bytes, 'image/jpeg')}
+
+            # Make the POST request with the image file
+            response = requests.post(api_url, files=files)
+
+            # Check if the request was successful (status code 200)
+            if response.status_code == 200:
+                print("Image successfully posted to the API.")
+                response_dict = json.loads(response.content.decode())
+                with self.prediction_lock:
+                    self.predictions.clear()
+                    self.predictions.update(response_dict)
+            else:
+                print(f"Error: {response.status_code} - {response.text}")
+        except Exception as e:
+            raise Exception
