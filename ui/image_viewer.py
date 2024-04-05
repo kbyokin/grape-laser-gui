@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-import threading
 import time
 from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout
 from PySide6.QtGui import QImage, QPixmap
@@ -12,6 +11,7 @@ class ImageViewer(QWidget, QObject):
     
     dx_data = Signal(int)
     dy_data = Signal(int)
+    distance = Signal(list)
     
     def __init__(self, camera_thread, predictions, prediction_lock, angles, angle_lock, control_motor):
         super().__init__()
@@ -25,10 +25,8 @@ class ImageViewer(QWidget, QObject):
         # self.setLayout(layout)
         
         self.image_label = QLabel()
-        self.image_title = QLabel("test")
         
         layout.addWidget(self.image_label)
-        layout.addWidget(self.image_title)
         
         # Get screen size
         timer = QTimer(self)
@@ -39,9 +37,9 @@ class ImageViewer(QWidget, QObject):
         # self.remove_timer.timeout.connect(self.update_remove_xyxy)
         # self.remove_timer.start(20000)
         
-        self.move_motor = QTimer(self)
-        self.move_motor.timeout.connect(self.update_motors)
-        self.move_motor.start(500)
+        # self.move_motor = QTimer(self)
+        # self.move_motor.timeout.connect(self.update_motors)
+        # self.move_motor.start(500)
         
         # self.motors_thread = threading.Thread(target=self.update_motors_thread)
         # self.motors_thread.daemon = True
@@ -63,7 +61,7 @@ class ImageViewer(QWidget, QObject):
         self.ALT = 80
         self.laser_signal = 1
         # send data to API when initilize class
-        self.control_motors.send_angles_api([self.AZ, self.ALT], self.laser_signal)
+        # self.control_motors.send_angles_api([self.AZ, self.ALT], self.laser_signal)
         
         self.mp3_file_path = "/Users/kb/Developer/laser_control_gui/mp3/cutberry.mp3"
         
@@ -78,7 +76,7 @@ class ImageViewer(QWidget, QObject):
         
     def get_datetime(self):
         current_datetime = QDateTime.currentDateTime()                
-        date_formatted =current_datetime.toString("yyyy-MM-dd HH:mm:ss")
+        date_formatted =current_datetime.toString("yyyy-MM-dd HH:mm:ss.zzz")
         return date_formatted
         
     def update_image(self):
@@ -133,6 +131,9 @@ class ImageViewer(QWidget, QObject):
                             self.dis_x, self.dis_y = image_center[0] - x_coor, image_center[1] - y_coor
                             self.dx_data.emit(self.dis_x)
                             self.dy_data.emit(self.dis_y)
+                            self.distance.emit([self.dis_x, self.dis_y])
+                            
+                            cv2.imwrite('remove.jpg', frame[removing_y1: removing_y2, removing_x1: removing_x2])
                             
                         cv2.circle(draw_image, (x_coor, y_coor), 2, (0, 0, 255), -1)
                         
@@ -147,9 +148,10 @@ class ImageViewer(QWidget, QObject):
                             self.play_track(self.mp3_file_path)
                             self.update_remove_xyxy()
                             
-                        self.image_title.setText(f'dis_x, dis_y: {self.dis_x, self.dis_y}')
-
-                        
+                    else:
+                        self.dx_data.emit(0)
+                        self.dy_data.emit(0)
+                        self.distance.emit([0, 0])
                         
             rgb_image = cv2.cvtColor(draw_image, cv2.COLOR_BGR2RGB)
             # cv2.imwrite(f'{self.save_path}/{self.current_frame}.jpg', rgb_image[:, :, ::-1])

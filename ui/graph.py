@@ -13,7 +13,7 @@ class SplineChart(QWidget):
         
         # Interval to update chart
         self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_plot)
+        # self.timer.timeout.connect(self.update_plot)
         self.update_interval = 1000 # ms
         
         self.x_data = []
@@ -63,7 +63,7 @@ class SplineChart(QWidget):
         self.x_data.append(len(self.x_data))
         self.y_data.append(data)
         # Limit data points to show only the latest ones
-        max_display_points = 50
+        max_display_points = 200
         if len(self.x_data) > max_display_points:
             self.x_data.clear()
             self.y_data.clear()

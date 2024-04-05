@@ -43,9 +43,9 @@ def main():
     main_window.resize(int(screen_w * .8), int(screen_h * .8))
     
     dx_chart = SplineChart()
-    dx_chart.setFixedSize(400, 300)
+    dx_chart.setFixedSize(800, 300)
     dy_chart = SplineChart(chart_color='green')
-    dy_chart.setFixedSize(400, 300)
+    dy_chart.setFixedSize(800, 300)
     
     image_viewer = ImageViewer(camera_thread, predictions, prediction_lock, angles, angle_lock, control_motor)
     
@@ -62,6 +62,8 @@ def main():
     
     image_viewer.dx_data.connect(dx_chart.update_values)
     image_viewer.dy_data.connect(dy_chart.update_values)
+    
+    image_viewer.distance.connect(control_motor.get_distance)
     
     main_window.show()
     ret = app.exec()
