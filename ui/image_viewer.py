@@ -1,13 +1,18 @@
 import os
 from pathlib import Path
+import threading
 import time
 from PySide6.QtWidgets import QLabel, QWidget, QVBoxLayout
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtCore import QTimer, QDateTime
+from PySide6.QtCore import QTimer, QDateTime, QObject, Signal
 import pygame
 import cv2
 
-class ImageViewer(QWidget):
+class ImageViewer(QWidget, QObject):
+    
+    dx_data = Signal(int)
+    dy_data = Signal(int)
+    
     def __init__(self, camera_thread, predictions, prediction_lock, angles, angle_lock, control_motor):
         super().__init__()
         self.camera_thread = camera_thread
@@ -38,6 +43,10 @@ class ImageViewer(QWidget):
         self.move_motor.timeout.connect(self.update_motors)
         self.move_motor.start(500)
         
+        # self.motors_thread = threading.Thread(target=self.update_motors_thread)
+        # self.motors_thread.daemon = True
+        # self.motors_thread.start()
+        
         self.current = time.time()
         
         self.current_frame = 100
@@ -47,7 +56,7 @@ class ImageViewer(QWidget):
         self.y_prime = 0
         
         self.removing_history = []
-        
+                
         self.dis_x, self.dis_y = 0, 0
         
         self.AZ = 50
@@ -83,7 +92,6 @@ class ImageViewer(QWidget):
                         
             with self.prediction_lock:
                 if self.predictions:
-                    # print(self.predictions)
                     if len(self.predictions['bunch']) > 0:
                         """
                         Draw rectangle on Grape bunch
@@ -110,8 +118,6 @@ class ImageViewer(QWidget):
                                 self.removing_history.append([x_coor, y_coor])
                                 
                                 print(f'initiate: {bunch_xyxy, remove_xyxy}')
-                                
-                                # cv2.rectangle(draw_image, (remove_xyxy[0], remove_xyxy[1]), (remove_xyxy[2], remove_xyxy[3]), (0, 255, 255), 2)
                                                                             
                         # draw removing berry with normalize points
                         if self.remove_xyxy_ is not None:
@@ -119,24 +125,14 @@ class ImageViewer(QWidget):
                             removing_x1, removing_y1, removing_x2, removing_y2 = map(int, remove_xyxy)
                             removing_center = (int(removing_x1+removing_x2) // 2, int(removing_y1+removing_y2) // 2)
                             
-                            # x_coor, y_coor = removing_center[0], removing_center[1]
-                            
                             x_coor = int(((bunch_x2 - bunch_x1) * self.x_prime) + bunch_x1)
                             y_coor = int(((bunch_y2 - bunch_y1) * self.y_prime) + bunch_y1)
                             
                             self.removing_history.append([x_coor, y_coor])
                             
                             self.dis_x, self.dis_y = image_center[0] - x_coor, image_center[1] - y_coor
-                                
-                            # self.AZ, self.ALT = self.control_motors.angles_cal(self.AZ, self.ALT, (self.dis_x, self.dis_y))
-                            # print(f'AZ: {self.AZ}, ALT: {self.ALT}')
-                            # self.control_motors.send_angles_api([self.AZ, self.ALT])
-                            
-                            # print(f"xyxy_: {self.remove_xyxy_}")
-                            # print(f'bunch xyxy: {bunch_xyxy}')
-                            # print(f"x y coor: {x_coor, y_coor}")
-                            
-                            # cv2.rectangle(draw_image, (removing_x1, removing_y1), (removing_x2, removing_y2), (0, 255, 255), 2)
+                            self.dx_data.emit(self.dis_x)
+                            self.dy_data.emit(self.dis_y)
                             
                         cv2.circle(draw_image, (x_coor, y_coor), 2, (0, 0, 255), -1)
                         
@@ -191,8 +187,14 @@ class ImageViewer(QWidget):
             
             self.removing_history.clear()
             self.remove_xyxy_ = self.predictions["remove"]
-            self.laser_signal = 0
-            
+            self.laser_signal = 1
+    
+    def update_motors_thread(self):
+        while True:
+            print('dfs')
+            self.update_motors()
+            time.sleep(0.3)
+    
     def update_motors(self):
         self.AZ, self.ALT = self.control_motors.angles_cal(self.AZ, self.ALT, (self.dis_x, self.dis_y))
         print(f'AZ: {self.AZ}, ALT: {self.ALT}')

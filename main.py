@@ -1,10 +1,11 @@
 from threading import Lock
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout
 
 from thread.control_motors import ControlMotor
 from thread.grape_prediction import GrapeDetection
 from ui.image_viewer import ImageViewer
+from ui.graph import SplineChart
 
 from thread.camera_thread import CameraThread
 
@@ -41,8 +42,27 @@ def main():
     screen_w, screen_h = screen_size.width(), screen_size.height()
     main_window.resize(int(screen_w * .8), int(screen_h * .8))
     
+    dx_chart = SplineChart()
+    dx_chart.setFixedSize(400, 300)
+    dy_chart = SplineChart(chart_color='green')
+    dy_chart.setFixedSize(400, 300)
+    
     image_viewer = ImageViewer(camera_thread, predictions, prediction_lock, angles, angle_lock, control_motor)
-    main_window.setCentralWidget(image_viewer)
+    
+    central_widget = QWidget()
+    main_window.setCentralWidget(central_widget)
+    layout = QVBoxLayout(central_widget)
+    layout.addWidget(image_viewer)
+    
+    chart_layout = QHBoxLayout()
+    chart_layout.addWidget(dx_chart)
+    chart_layout.addWidget(dy_chart)
+    
+    layout.addLayout(chart_layout)
+    
+    image_viewer.dx_data.connect(dx_chart.update_values)
+    image_viewer.dy_data.connect(dy_chart.update_values)
+    
     main_window.show()
     ret = app.exec()
     camera_thread.stop()
