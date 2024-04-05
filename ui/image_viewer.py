@@ -52,7 +52,9 @@ class ImageViewer(QWidget):
         
         self.AZ = 50
         self.ALT = 80
-        self.control_motors.send_angles_api([self.AZ, self.ALT])
+        self.laser_signal = 1
+        # send data to API when initilize class
+        self.control_motors.send_angles_api([self.AZ, self.ALT], self.laser_signal)
         
         self.mp3_file_path = "/Users/kb/Developer/laser_control_gui/mp3/cutberry.mp3"
         
@@ -145,9 +147,10 @@ class ImageViewer(QWidget):
                         
                         
                         if -10 <= self.dis_x <= 10 and -10 <= self.dis_y <= 10:
-                            self.update_remove_xyxy()
+                            self.laser_signal = 1
                             self.play_track(self.mp3_file_path)
-                        
+                            self.update_remove_xyxy()
+                            
                         self.image_title.setText(f'dis_x, dis_y: {self.dis_x, self.dis_y}')
 
                         
@@ -188,11 +191,12 @@ class ImageViewer(QWidget):
             
             self.removing_history.clear()
             self.remove_xyxy_ = self.predictions["remove"]
+            self.laser_signal = 0
             
     def update_motors(self):
         self.AZ, self.ALT = self.control_motors.angles_cal(self.AZ, self.ALT, (self.dis_x, self.dis_y))
         print(f'AZ: {self.AZ}, ALT: {self.ALT}')
-        self.control_motors.send_angles_api([self.AZ, self.ALT])
+        self.control_motors.send_angles_api([self.AZ, self.ALT], self.laser_signal)
         
     def play_track(self, file_path):
         pygame.mixer.init()

@@ -135,10 +135,10 @@ class ControlMotor(Thread):
         # print(f'calculated angles {AZ, ALT}')
         return AZ, ALT
     
-    def send_angles_api(self, angles):
+    def send_angles_api(self, angles, laser_signal):
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((self.server_url, 12345))
-        data_to_send = f"{angles[0]},{angles[1]}"
+        data_to_send = f"{angles[0]},{angles[1]},{laser_signal}"
         client_socket.send(data_to_send.encode())
         client_socket.close()
         
