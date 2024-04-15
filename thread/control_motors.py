@@ -3,11 +3,8 @@ import socket
 from threading import Thread
 
 class ControlMotor(Thread):
-    def __init__(self, camera_thread, predictions, prediction_lock):
+    def __init__(self):
         super().__init__()
-        self.camera_thread = camera_thread
-        self.predictions = predictions
-        self.prediction_lock = prediction_lock
         
         self.AZ = 50
         self.ALT = 80
@@ -24,7 +21,7 @@ class ControlMotor(Thread):
         while self.running:
             if self.dx and self.dy:
                 self.AZ, self.ALT = self.angles_cal(self.AZ, self.ALT, (self.dx, self.dy))
-                self.send_angles_api([self.AZ, self.ALT], 0)
+                self.send_angles_api([self.AZ, self.ALT], 1)
                 time.sleep(0.5)
         
     def angles_cal(self, AZ, ALT, distance):
@@ -75,7 +72,7 @@ class ControlMotor(Thread):
         # print(f'calculated angles {AZ, ALT}')
         return AZ, ALT
     
-    def send_angles_api(self, angles, laser_signal):
+    def send_angles_api(self, angles: list[int], laser_signal: int) -> None:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((self.server_url, 12345))
         data_to_send = f"{angles[0]},{angles[1]},{laser_signal}"

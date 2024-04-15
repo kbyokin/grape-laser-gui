@@ -27,7 +27,7 @@ def main():
     grape_detection = GrapeDetection(camera_thread, predictions, prediction_lock, grape_model_path, removal_model_path)
     grape_detection.start()
     
-    control_motor = ControlMotor(camera_thread, predictions, prediction_lock)
+    control_motor = ControlMotor()
     control_motor.start()
     # control_motor = []
     

@@ -1,20 +1,20 @@
-from threading import Lock, Thread
-import time
-import pyrealsense2.pyrealsense2 as rs
 import cv2
-import numpy as np
 
-from grape_detection_ import GrapeDetection
-
-camera_id=0
+camera_id = 0
 cap = cv2.VideoCapture(camera_id)
-grape_model = GrapeDetection()
+
 try:
     while True:
         ret, frame = cap.read()
         if ret:
-            print(frame.shape)
-            pred = grape_model.predict(frame)
-            print(pred)
+            w, h, ch = frame.shape
+            print("Frame dimensions:", w, h)
+            image_center = [(h // 2), (w // 2)]
+            cv2.circle(frame, (int(h // 2), int(w // 2)), 10, (0, 0, 255), 2)
+            cv2.imshow('', frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                break  # Quit if 'q' is pressed
 finally:
     cap.release()
+    cv2.destroyAllWindows()

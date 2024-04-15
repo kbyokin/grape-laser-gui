@@ -44,14 +44,14 @@ class CameraThread(Thread):
                     
                     frames = self.pipeline.wait_for_frames(5000)
                     
-                    # color_frame = frames.get_color_frame()
-                    # depth_frame = frames.get_depth_frame()
+                    color_frame = frames.get_color_frame()
+                    depth_frame = frames.get_depth_frame()
                     
                     # ! Could not retrive any frames --> Further investigation needed
-                    aligned_frames = self.align.process(frames)
-                    time.sleep(0.03)
-                    depth_frame = aligned_frames.get_depth_frame()
-                    color_frame = aligned_frames.get_color_frame()
+                    # aligned_frames = self.align.process(frames)
+                    # time.sleep(0.03)
+                    # depth_frame = aligned_frames.get_depth_frame()
+                    # color_frame = aligned_frames.get_color_frame()
                     
                     if not color_frame or not depth_frame:
                         continue
