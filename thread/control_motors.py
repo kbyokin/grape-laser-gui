@@ -6,12 +6,15 @@ class ControlMotor(Thread):
     def __init__(self):
         super().__init__()
         
-        self.AZ = 50
-        self.ALT = 80
+        self.AZ = 70
+        self.ALT = 50
         
         self.dx, self.dy = None, None
         
-        self.server_url = '172.23.161.159'
+        # self.server_url = '172.23.161.123'
+        # self.server_url = '172.23.161.170'
+        # self.server_url = '172.23.52.222'
+        self.server_url = '192.168.43.17'
         
         self.running = True
         
@@ -22,8 +25,56 @@ class ControlMotor(Thread):
             if self.dx and self.dy:
                 self.AZ, self.ALT = self.angles_cal(self.AZ, self.ALT, (self.dx, self.dy))
                 self.send_angles_api([self.AZ, self.ALT], 1)
-                time.sleep(0.5)
+                time.sleep(0.8)
         
+    # def angles_cal(self, AZ, ALT, distance):
+    #     dis_x, dis_y = distance
+    #     AZ, ALT = int(AZ), int(ALT)
+    #     min_angle, max_angle = 0, 160
+        
+    #     if dis_x > 10:
+    #         if dis_x < 200:
+    #             if dis_x < 50:
+    #                 AZ = max(min(AZ + 2, max_angle), min_angle)
+    #             else:
+    #                 AZ = max(min(AZ + 4, max_angle), min_angle)
+    #         else:
+    #             AZ = max(min(AZ + 1, max_angle), min_angle)
+    #     elif dis_x < -10:
+    #         if dis_x > -200:
+    #             if dis_x > -50:
+    #                 AZ = max(min(AZ - 2, max_angle), min_angle)
+    #             else:
+    #                 AZ = max(min(AZ - 4, max_angle), min_angle)
+    #         else:
+    #             AZ = max(min(AZ - 1, max_angle), min_angle)
+    #     else:
+    #         # print('should not update AZ')
+    #         pass
+                
+    #     if dis_y > 10:
+    #         if dis_y < 200:    
+    #             if dis_y < 50:
+    #                 ALT = max(min(ALT + 2, max_angle), min_angle)
+    #             else:
+    #                 ALT = max(min(ALT + 4, max_angle), min_angle)
+    #         else:
+    #             ALT = max(min(ALT + 1, max_angle), min_angle)
+    #     elif dis_y < -10:
+    #         if dis_y > -200:
+    #             if dis_y > -50:
+    #                 ALT = max(min(ALT - 2, max_angle), min_angle)
+    #             else:
+    #                 ALT = max(min(ALT - 4, max_angle), min_angle)
+    #         else:
+    #             ALT = max(min(ALT - 1, max_angle), min_angle)
+    #     else:
+    #         # print('should not update AZ')
+    #         pass
+        
+    #     # print(f'calculated angles {AZ, ALT}')
+    #     return AZ, ALT
+    
     def angles_cal(self, AZ, ALT, distance):
         dis_x, dis_y = distance
         AZ, ALT = int(AZ), int(ALT)

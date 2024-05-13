@@ -1,6 +1,6 @@
 from threading import Lock, Thread
 import time
-import pyrealsense2.pyrealsense2 as rs
+# import pyrealsense2.pyrealsense2 as rs
 import cv2
 import numpy as np
 

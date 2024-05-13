@@ -3,24 +3,188 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IMU Data Viewer</title>
-    <script>
-        function getIMUData() {
-            var xhr = new XMLHttpRequest();
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState == 4 && xhr.status == 200) {
-                    document.getElementById("imuData").innerText = xhr.responseText;
-                }
-            };
-            xhr.open("GET", "http://172.23.161.170", true); // Replace with your Raspberry Pi Pico's IP address
-            xhr.send();
+    <title>3D Box with IMU Data using Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
         }
-
-        setInterval(getIMUData, 30); // Periodically call getIMUData every 10 seconds (10000 milliseconds)
-    </script>
+        canvas {
+            display: block;
+        }
+        #imu-data {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+        }
+    </style>
 </head>
 <body>
-    <h1>IMU Data</h1>
-    <div id="imuData"></div>
+    <div id="imu-data">
+        <div id="ax-label">Acceleration X:</div>
+        <div id="ay-label">Acceleration Y:</div>
+        <div id="az-label">Acceleration Z:</div>
+        <div id="gx-label">Gyroscope X:</div>
+        <div id="gy-label">Gyroscope Y:</div>
+        <div id="gz-label">Gyroscope Z:</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Set up scene, camera, and renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Enable shadow mapping
+        document.body.appendChild(renderer.domElement);
+
+        // Create box geometry
+        const geometry = new THREE.BoxGeometry(2, 1, 2);
+
+        // Define different materials for each face of the box
+        const materials = [
+            new THREE.MeshStandardMaterial({ color: 0xff0000 }), // red
+            new THREE.MeshStandardMaterial({ color: 0x00ff00 }), // green
+            new THREE.MeshStandardMaterial({ color: 0x0000ff }), // blue
+            new THREE.MeshStandardMaterial({ color: 0xffff00 }), // yellow
+            new THREE.MeshStandardMaterial({ color: 0xff00ff }), // magenta
+            new THREE.MeshStandardMaterial({ color: 0x00ffff })  // cyan
+        ];
+
+        // Apply materials to the faces of the box
+        const cube = new THREE.Mesh(geometry, materials);
+        cube.castShadow = true; // Enable shadow casting for the cube
+
+        // Position the box
+        cube.position.set(0, 0, -5);
+
+        // Add the box to the scene
+        scene.add(cube);
+
+        // Create plane geometry
+        const planeGeometry = new THREE.PlaneGeometry(50, 50, 100, 100);
+
+        // Create plane material
+        const planeMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+
+        // Create the plane mesh
+        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        plane.rotation.x = -Math.PI / 2; // Rotate the plane to be horizontal
+        plane.position.y = -5; // Lower the plane beneath the cube
+        plane.receiveShadow = true; // Enable shadow receiving for the plane
+
+        // Add the plane to the scene
+        scene.add(plane);
+
+        // Create axes group
+        const axesGroup = new THREE.Group();
+
+        // Create axes
+        const axesHelper = new THREE.AxesHelper(1);
+        axesGroup.add(axesHelper); // Parent axes to the group
+
+        // Create labels for each axis
+        const fontLoader = new THREE.FontLoader();
+        fontLoader.load('https://cdn.rawgit.com/mrdoob/three.js/master/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+            const axisLabels = ['X', 'Y', 'Z'];
+            const labelMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            axisLabels.forEach((label, index) => {
+                const textGeometry = new THREE.TextGeometry(label, {
+                    font: font,
+                    size: 20,
+                    height: 5
+                });
+                const textMesh = new THREE.Mesh(textGeometry, labelMaterial);
+                const axisEndPoints = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+                axesHelper.getWorldPosition(axisEndPoints[index]);
+                textMesh.position.copy(axisEndPoints[index]);
+                textMesh.position.add(new THREE.Vector3(10, 10, 10)); // Offset position
+                axesGroup.add(textMesh); // Parent labels to the group
+            });
+        });
+
+        // Position the axes group at the bottom corner of the cube
+        const bbox = new THREE.Box3().setFromObject(cube);
+        const cubeSize = new THREE.Vector3();
+        bbox.getSize(cubeSize);
+        axesGroup.position.set(-cubeSize.x / 2, -cubeSize.y / 2, -cubeSize.z / 2);
+
+        // Add the axes group to the scene
+        scene.add(axesGroup);
+
+        // Position the axes at the bottom corner of the cube
+        axesHelper.position.set(-cubeSize.x, -cubeSize.y, -cubeSize.z);
+        cube.add(axesHelper); // Parent axes to the cube
+
+        // Add lights to the scene
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // soft white light
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(1, 2, 1).normalize(); // Adjust light position
+        directionalLight.castShadow = true; // Enable shadow casting for the directional light
+        scene.add(directionalLight);
+
+        // Enable directional light helper
+        // const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight, 1); // Adjust the size as needed
+        // scene.add(directionalLightHelper);
+
+        // Set camera position
+        camera.position.z = 3;
+
+        // Function to update box rotation based on IMU data
+        function updateBoxRotation(ax, ay, az, gx, gy, gz) {
+            // Convert accelerometer data to rotation angles (in radians)
+            const rotationX = Math.atan2(ay, Math.sqrt(ax * ax + az * az));
+            const rotationY = Math.atan2(-ax, az);
+
+            // Update box rotation (convert radians to degrees)
+            cube.rotation.x = rotationX;
+            cube.rotation.y = rotationY;
+
+            // Update IMU data display
+            document.getElementById('ax-label').textContent = `Acceleration X: ${ax.toFixed(2)}`;
+            document.getElementById('ay-label').textContent = `Acceleration Y: ${ay.toFixed(2)}`;
+            document.getElementById('az-label').textContent = `Acceleration Z: ${az.toFixed(2)}`;
+            document.getElementById('gx-label').textContent = `Gyroscope X: ${gx.toFixed(2)}`;
+            document.getElementById('gy-label').textContent = `Gyroscope Y: ${gy.toFixed(2)}`;
+            document.getElementById('gz-label').textContent = `Gyroscope Z: ${gz.toFixed(2)}`;
+        }
+
+        // Function to fetch IMU data from the Pi Pico's HTTP server and update box rotation
+        function updateBoxWithIMUData() {
+            // Fetch IMU data from Raspberry Pi Pico's HTTP server
+            fetch('http://172.23.161.170')  // Replace with your Raspberry Pi Pico's IP address
+                .then(response => response.text())
+                .then(data => {
+                    // Parse the IMU data
+                    var imuData = data.split(' ');
+                    var ax = parseFloat(imuData[0].split(':')[1]);
+                    var ay = parseFloat(imuData[1].split(':')[1]);
+                    var az = parseFloat(imuData[2].split(':')[1]);
+                    var gx = parseFloat(imuData[3].split(':')[1]);
+                    var gy = parseFloat(imuData[4].split(':')[1]);
+                    var gz = parseFloat(imuData[5].split(':')[1]);
+
+                    // Update box rotation with IMU data
+                    updateBoxRotation(ax, ay, az, gx, gy, gz);
+                })
+                .catch(error => console.error('Error fetching IMU data:', error));
+        }
+
+        // Function to animate the scene
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Update box rotation with IMU data every frame
+        setInterval(updateBoxWithIMUData, 16); // Update approximately every 16 milliseconds (60 times per second)
+    </script>
 </body>
 </html>
