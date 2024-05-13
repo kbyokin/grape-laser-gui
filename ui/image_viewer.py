@@ -58,7 +58,7 @@ class ImageViewer(QWidget, QObject):
         self.dis_x, self.dis_y = 0, 0
         
         self.AZ = 50
-        self.ALT = 80
+        self.ALT = 30
         self.laser_signal = 1
         # send data to API when initilize class
         # self.control_motors.send_angles_api([self.AZ, self.ALT], self.laser_signal)
@@ -142,17 +142,21 @@ class ImageViewer(QWidget, QObject):
                                 if indx + 1 < len(self.removing_history):
                                     cv2.line(draw_image, (self.removing_history[indx][0], self.removing_history[indx][1]), (self.removing_history[indx + 1][0], self.removing_history[indx + 1][1]), (255, 0, 0))
                         
-                        
+                        # Update removing berry
                         if -10 <= self.dis_x <= 10 and -10 <= self.dis_y <= 10:
                             self.laser_signal = 1
-                            self.play_track(self.mp3_file_path)
+                            # self.play_track(self.mp3_file_path)
                             self.update_remove_xyxy()
                             
                     else:
+                        print('else')
                         self.dx_data.emit(0)
                         self.dy_data.emit(0)
                         self.distance.emit([0, 0])
-                        
+            
+            # Flip camera upward
+            # rotated_image = cv2.rotate(draw_image, cv2.ROTATE_180)
+            # rgb_image = cv2.cvtColor(rotated_image, cv2.COLOR_BGR2RGB)
             rgb_image = cv2.cvtColor(draw_image, cv2.COLOR_BGR2RGB)
             # cv2.imwrite(f'{self.save_path}/{self.current_frame}.jpg', rgb_image[:, :, ::-1])
             self.current_frame += 1
@@ -191,6 +195,7 @@ class ImageViewer(QWidget, QObject):
             self.remove_xyxy_ = self.predictions["remove"]
             self.laser_signal = 1
     
+    # Execute update_motors every interval --> Not use currently
     def update_motors_thread(self):
         while True:
             print('dfs')
@@ -198,6 +203,7 @@ class ImageViewer(QWidget, QObject):
             time.sleep(0.3)
     
     def update_motors(self):
+        # calculate angle based on distance
         self.AZ, self.ALT = self.control_motors.angles_cal(self.AZ, self.ALT, (self.dis_x, self.dis_y))
         print(f'AZ: {self.AZ}, ALT: {self.ALT}')
         self.control_motors.send_angles_api([self.AZ, self.ALT], self.laser_signal)
